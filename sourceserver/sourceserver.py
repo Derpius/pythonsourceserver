@@ -8,7 +8,7 @@ from sourceserver.peekablestream import PeekableStream
 class SourceError(Exception):
 	'''Errors regarding source engine servers, automatically closes the socket when raised'''
 	def __init__(self, server, message):
-		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
+		super().__init__("Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message)
 		server.close()
 		
 
