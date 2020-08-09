@@ -4,11 +4,11 @@ This is currently a work in progess, but performs all 3 non depreciated queries 
 ### Known problems/limitations I'm working on:
 * Doesn't support The Ship servers as the response packets are different
 * Goldensource servers will cause unknown (possibly uncaught) errors
-* Calling `.getPlayers()` on CS:GO servers will result in unknown (possibly uncaught) errors if `host_players_show` is not  2. See warning at https://developer.valvesoftware.com/wiki/Server_queries#Response_Format_2
 
 ### Untested
 * Split package payload decompression
 * Split package size attribute detection
+* CS:GO servers with `host_players_show` set to 1 as I am currently unable to find a server that uses this
 
 ## Installation
 `pip install sourceserver`
