@@ -3,7 +3,7 @@ import struct
 import re
 import time
 import bz2
-from peekablestream import PeekableStream
+from sourceserver.peekablestream import PeekableStream
 
 class SourceError(Exception):
 	'''Errors regarding source engine servers, automatically closes the socket when raised'''
@@ -66,6 +66,10 @@ class SourceServer():
 		return self._response()
 
 	def _getAppID(self):
+		'''
+		Gets the app id from self.info,\n
+		if truncated returns 24 least significant bits of game_id as per https://developer.valvesoftware.com/wiki/Server_queries#A2S_INFO
+		'''
 		if "game_id" in self.info.keys():
 			return 16777215 & self.info["game_id"]
 
@@ -79,6 +83,7 @@ class SourceServer():
 		raise SourceError(self, "Invalid packet header")
 
 	def _processSplitPacket(self, splitPacket: bytes) -> bytes:
+		'''Orders, concatenates, and decompresses the payloads of a split packet'''
 		if not self._packetSplit(splitPacket): raise SourceError(self, "Attempted to process singular packet as split")
 		# Define split packet attributes
 		packetID = self._scanInt(PeekableStream(splitPacket[4:8]), 32)
@@ -235,20 +240,3 @@ class SourceServer():
 
 		# Tokenise and return rules
 		return self._tokeniseRules(response[5:])
-
-if __name__ == "__main__":
-	connectionString = "73.39.12.208:27015" # Fast's server
-	#connectionString = "50.97.113.109:27015" # other testing
-
-	try:
-		srv = SourceServer(connectionString)
-
-		count, players = srv.getPlayers()
-		print("Number of players online:", count)
-		print("Players:", players)
-
-		print("Server name:", srv.info["name"])
-
-		srv.close()
-	except SourceError as e:
-		print(e.message)
