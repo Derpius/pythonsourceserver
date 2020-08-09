@@ -8,7 +8,8 @@ from sourceserver.peekablestream import PeekableStream
 class SourceError(Exception):
 	'''Errors regarding source engine servers, automatically closes the socket when raised'''
 	def __init__(self, server, message):
-		super().__init__("Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message)
+		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
+		super().__init__(self.message)
 		server.close()
 		
 
@@ -31,7 +32,8 @@ class SourceServer():
 		self.port = int(self.port)
 
 		self.refreshInfo()
-	
+		self._log("Connected successfully")
+
 	def _log(self, *args):
 		print("Source Server @ ", self.ip, ":", self.port, " | ", *args, sep="")
 
@@ -64,16 +66,6 @@ class SourceServer():
 		if self.isClosed: raise SourceError(self, "Request attempt made on closed socket")
 		self.socket.sendto(request, (self.ip, self.port))
 		return self._response()
-
-	def _getAppID(self):
-		'''
-		Gets the app id from self.info,\n
-		if truncated returns 24 least significant bits of game_id as per https://developer.valvesoftware.com/wiki/Server_queries#A2S_INFO
-		'''
-		if "game_id" in self.info.keys():
-			return 16777215 & self.info["game_id"]
-
-		return self.info["id"]
 	
 	def _packetSplit(self, packet: bytes) -> bool:
 		'''Checks whether a packet is split or not, returns true if so'''
@@ -89,7 +81,7 @@ class SourceServer():
 		packetID = self._scanInt(PeekableStream(splitPacket[4:8]), 32)
 		totalPackets = splitPacket[8]
 		compressed = packetID < 0
-		sizeAttrPresent = not (self.info["protocol"] == 7 and self._getAppID() in (215, 17550, 17700, 240))
+		sizeAttrPresent = not (self.info["protocol"] == 7 and self.info["id"] in (215, 17550, 17700, 240))
 
 		# Define empty array to order the packets into
 		packets = [None] * totalPackets
@@ -163,7 +155,8 @@ class SourceServer():
 				tokens[name] = self._scanInt(chars, 16)
 			
 			if name == "game" and tokens[name] == "The Ship": raise SourceError(self, "'The Ship' servers not currently supported due to different response params, sorry.")
-			elif name == "server_type" and b"%c" % tokens[name] == b"p": raise SourceError(self, "SourceTV proxies not supported.")
+			#elif name == "server_type" and b"%c" % tokens[name] == b"p": raise SourceError(self, "SourceTV proxies not supported.")
+			# looks like the code could work with proxies so I've commented out the line that raises an error, untested though
 		
 		if tokens["EDF"] & 0x80: tokens.update({ "port": self._scanInt(chars, 16) })
 		if tokens["EDF"] & 0x10: tokens.update({ "steam_id": self._scanInt(chars, 64, False) })
@@ -171,7 +164,9 @@ class SourceServer():
 			tokens.update({ "sourceTV_port": self._scanInt(chars, 16) })
 			tokens.update({ "sourceTV_name": self._scanString(chars) })
 		if tokens["EDF"] & 0x20: tokens.update({ "keywords": self._scanString(chars) })
-		if tokens["EDF"] & 0x01: tokens.update({ "game_id": self._scanInt(chars, 64, False) })
+		if tokens["EDF"] & 0x01:
+			tokens.update({ "game_id": self._scanInt(chars, 64, False) })
+			tokens["id"] = 16777215 & tokens["game_id"]
 		
 		return tokens
 
@@ -205,20 +200,28 @@ class SourceServer():
 		# Tokenise and return info
 		tokens = self._tokeniseInfo(response[5:])
 		self.info = tokens
-
+	
 	def getPlayers(self) -> tuple:
 		'''
 		Gets a list of all players on the server\n
-		returns (count: int, players: tuple)
+		returns (count: int, players: tuple)\n
+		If server is running CS:GO and has disabled returning players, connection times out\n
+		If server is running CS:GO and has been set to only return max players and server uptime, returns (max players: int, server uptime: float)
 		'''
+
+		if self.info["game"] == "Counter-Strike: Global Offensive": self._log("Warning, server is running CS:GO, expect connection timeout if set to not show players")
+
 		# Send challenge request
-		challengeResponse =    self._request(bytes.fromhex("FF FF FF FF 55 FF FF FF FF"))
+		challengeResponse = self._request(bytes.fromhex("FF FF FF FF 55 FF FF FF FF"))
 		if len(challengeResponse) != 9 or challengeResponse[4] != 0x41: raise SourceError(self, "Challenge response header invalid")
 
 		# Get player list
 		response = self._request(bytes.fromhex("FF FF FF FF 55") + challengeResponse[5:])
 		if self._packetSplit(response): response = self._processSplitPacket(response)
 		if len(response) < 6 or response[4] != 0x44: raise SourceError(self, "Players response header invalid")
+		if self.info["game"] == "Counter-Strike: Global Offensive" and len(response) == 9:
+			self._log("Warning, CS:GO server has only returned max players and server uptime")
+			return response[5], self._scanFloat(PeekableStream(response[6:]), 32)
 		
 		# Tokenise and return players
 		players = tuple(self._tokenisePlayers(response[6:]))
@@ -229,6 +232,10 @@ class SourceServer():
 		Gets a list of all rules on the server\n
 		returns rules as a dictionary of name: value pairs
 		'''
+
+		# Check if the game the server is running is CS:GO, if so, log message and return
+		if self.info["game"] == "Counter-Strike: Global Offensive": self._log("CS:GO servers don't support rules requests"); return
+
 		# Send challenge request
 		challengeResponse =    self._request(bytes.fromhex("FF FF FF FF 56 FF FF FF FF"))
 		if len(challengeResponse) != 9 or challengeResponse[4] != 0x41: raise SourceError(self, "Challenge response header invalid")
