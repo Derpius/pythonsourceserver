@@ -11,7 +11,7 @@ This is currently a work in progess, but performs all 3 non depreciated queries 
 * Split package size attribute detection
 
 ## Installation
-`pip install -i https://test.pypi.org/simple/ sourceserver`
+`pip install sourceserver`
 
 ## Usage
 A `SourceServer` object acts as a connection to a Source engine server, with its own socket.  
