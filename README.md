@@ -39,6 +39,7 @@ The `.getPlayers()` method returns (count, players), where count is the count sp
 Also, it appears that if a player is in the process of joining, they will still be in the players tuple with valid information, but their name will be blank. This may mean that the note on the valve dev website is incorrect, as the player is counted as joined still.
 
 ## Example
+*Note, the output will be slightly different as it now prints messages regarding connection status*
 ```python
 >>> from sourceserver.sourceserver import SourceServer
 >>> srv = SourceServer("89.35.29.5:27085")
