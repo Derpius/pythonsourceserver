@@ -60,7 +60,7 @@ Trouble in Terrorist Town
 ```
 
 ## Discord Server
-https://discord.gg/D6s5SX
+https://discord.gg/aKDNstq
 
 ## License
 GNU General Public License v3.0
