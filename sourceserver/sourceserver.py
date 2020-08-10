@@ -6,11 +6,10 @@ import bz2
 from sourceserver.peekablestream import PeekableStream
 
 class SourceError(Exception):
-	'''Errors regarding source engine servers, automatically closes the socket when raised'''
+	'''Errors regarding source engine servers'''
 	def __init__(self, server, message):
 		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
 		super().__init__(self.message)
-		server.close()
 
 class SourceServer():
 	'''
@@ -25,12 +24,19 @@ class SourceServer():
 
 		if not self._validConString(connectionString): raise ValueError("Connection string invalid")
 
+		# Init socket
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket.setblocking(0)
+
+		# Set IP and port
 		self.ip, self.port = connectionString.split(":")
 		self.port = int(self.port)
 
-		self._log("Connected successfully")
+		try: self._connect()
+		except SourceError:
+			self._log("Failed to connect to server")
+			self.isClosed = True
+		else: self._log("Successfully established connection to server")
 
 	@property
 	def info(self):
@@ -41,15 +47,31 @@ class SourceServer():
 
 	def _validConString(self, conString: str) -> bool:
 		'''Validates a connection string'''
-		pat = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
+		# Super long regex that validates a string is a valid ip, then :, then a valid port number
+		pat = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
 		if re.match(pat, conString): return True
 		return False
+
+	def _connect(self):
+		self._log("Connecting...")
+
+		# This will raise an error if not connected
+		_ = self.info
 
 	def close(self):
 		if self.isClosed: self._log("Connection to server already closed"); return
 		self._log("Closing connection to server.")
-		self.socket.close()
 		self.isClosed = True
+
+	def retry(self):
+		if not self.isClosed: self._log("Connection to server is already active"); return
+		try:
+			self.isClosed = False
+			self._connect()
+		except SourceError:
+			self.isClosed = True
+			self._log("Failed to reconnect")
+		else: self._log("Reconnected successfully")
 	
 	def _response(self) -> bytes:
 		'''Listens for a response from server, raises SourceError if max retries is hit'''
@@ -65,7 +87,7 @@ class SourceServer():
 
 	def _request(self, request: bytes) -> bytes:
 		'''Makes a UDP request and returns response as bytes'''
-		if self.isClosed: raise SourceError(self, "Request attempt made on closed socket")
+		if self.isClosed: raise SourceError(self, "Request attempt made on closed connection")
 		self.socket.sendto(request, (self.ip, self.port))
 		return self._response()
 	

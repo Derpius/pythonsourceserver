@@ -7,7 +7,7 @@ I push changes to the master branch whenever I finish a session of working on th
 * Goldensource servers will cause unknown (possibly uncaught) errors
 
 ### New features I'm working on
-* Server retry method, which will try to re-establish a connection to the server it represents if closed
+* Get the ping to the server, either as a seperate function or as part of the info param. If I do make it a function it'll still be using the info param, but will just return the value of the ping element
 
 ### Untested
 * Split package payload decompression
@@ -21,7 +21,7 @@ I push changes to the master branch whenever I finish a session of working on th
 ## Usage
 A `SourceServer` object acts as a connection to a Source engine server, with its own socket.  
 To instantiate a new `SourceServer` object, simply pass it a connection string in the form `ipv4:port`, the object will attempt to get the server's info, and if the connection fails after max retries, raises a `SourceError`.  
-Note, all errors that are expected are raised as `SourceError`, which closes the server object's socket when raised.
+Note, all errors that are expected are raised as `SourceError`, which marks the server as closed, but does not actually close the socket so the connection can be re-established.
 
 The information regarding a server is retrieved each time you access the `.info` property, and is a dictionary in the form `"info_type": "value"`.  
 Any attempts to set the `.info` property will result in an `AttributeError`.
@@ -31,7 +31,8 @@ Any attempts to set the `.info` property will result in an `AttributeError`.
 |--------|-------------|
 | `SourceServer.getPlayers()` | Returns a tuple containing each player on the server, and the count<br>(see below) |
 | `SourceServer.getRules()` | Returns the server rules as a dictionary of `name: value` pairs<br>Note, if the server is running CS:GO, this will time out |
-| `SourceServer.close()` | Closes the server connection and prevents further requests from being made.<br>While it is possible to reuse a `SourceServer` object by manually setting its properties, it's meant to represent a singular instance of a server
+| `SourceServer.close()` | Closes the server connection and prevents further requests from being made.<br>While it is possible to reuse a `SourceServer` object by manually setting its properties, it's meant to represent a singular instance of a server |
+|`SourceServer.retry()` | Attempts to re-establish a connection to the server
 
 The `.getPlayers()` method returns (count, players), where count is the count specified in the response packet (can be different from actual number of players returned, see note at https://developer.valvesoftware.com/wiki/Server_queries#Response_Format_2), and players is a tuple of tuples, where each tuple represents a player and is in the format `(index: int, name: str, score: int, duration: float)`, unless the server is running The Ship, in which case they're in the format `(index: int, name: str, score: int, duration: float, deaths: int, money: int)`
 
