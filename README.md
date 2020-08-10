@@ -64,3 +64,5 @@ https://discord.gg/D6s5SX
 
 ## License
 GNU General Public License v3.0
+
+(THIS IS A TEST TO SEE IF THE PUSH/RELEASES WEBHOOK IS WORKING)
