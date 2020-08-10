@@ -59,11 +59,13 @@ class SourceServer():
 		_ = self.info
 
 	def close(self):
+		'''Marks the server as closed, reconnect with retry()'''
 		if self.isClosed: self._log("Connection to server already closed"); return
 		self._log("Closing connection to server.")
 		self.isClosed = True
 
 	def retry(self):
+		'''Attempts to reconnect to the server after being closed'''
 		if not self.isClosed: self._log("Connection to server is already active"); return
 		try:
 			self.isClosed = False
@@ -72,6 +74,15 @@ class SourceServer():
 			self.isClosed = True
 			self._log("Failed to reconnect")
 		else: self._log("Reconnected successfully")
+
+	def ping(self, places=0):
+		'''
+		Times an info request to the server and returns it in miliseconds\n
+		places is how many decimal places to round the ping to, default is 0
+		'''
+		sendTime = time.time()
+		_ = self.info
+		return round((time.time() - sendTime) * 1000, places)
 	
 	def _response(self) -> bytes:
 		'''Listens for a response from server, raises SourceError if max retries is hit'''
