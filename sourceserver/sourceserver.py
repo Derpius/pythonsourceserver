@@ -6,12 +6,10 @@ import bz2
 from sourceserver.peekablestream import PeekableStream
 
 class SourceError(Exception):
-	'''Errors regarding source engine servers, automatically closes the socket when raised'''
+	'''Errors regarding source engine servers'''
 	def __init__(self, server, message):
 		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
 		super().__init__(self.message)
-		server.close()
-		
 
 class SourceServer():
 	'''
@@ -26,28 +24,54 @@ class SourceServer():
 
 		if not self._validConString(connectionString): raise ValueError("Connection string invalid")
 
+		# Init socket
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket.setblocking(0)
+
+		# Set IP and port
 		self.ip, self.port = connectionString.split(":")
 		self.port = int(self.port)
 
-		self.refreshInfo()
-		self._log("Connected successfully")
+		try: self._connect()
+		except SourceError:
+			self._log("Failed to connect to server")
+			self.isClosed = True
+		else: self._log("Successfully established connection to server")
+
+	@property
+	def info(self):
+		return self._getInfo()
 
 	def _log(self, *args):
 		print("Source Server @ ", self.ip, ":", self.port, " | ", *args, sep="")
 
 	def _validConString(self, conString: str) -> bool:
 		'''Validates a connection string'''
-		pat = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
+		# Super long regex that validates a string is a valid ip, then :, then a valid port number
+		pat = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
 		if re.match(pat, conString): return True
 		return False
+
+	def _connect(self):
+		self._log("Connecting...")
+
+		# This will raise an error if not connected
+		_ = self.info
 
 	def close(self):
 		if self.isClosed: self._log("Connection to server already closed"); return
 		self._log("Closing connection to server.")
-		self.socket.close()
 		self.isClosed = True
+
+	def retry(self):
+		if not self.isClosed: self._log("Connection to server is already active"); return
+		try:
+			self.isClosed = False
+			self._connect()
+		except SourceError:
+			self.isClosed = True
+			self._log("Failed to reconnect")
+		else: self._log("Reconnected successfully")
 	
 	def _response(self) -> bytes:
 		'''Listens for a response from server, raises SourceError if max retries is hit'''
@@ -63,7 +87,7 @@ class SourceServer():
 
 	def _request(self, request: bytes) -> bytes:
 		'''Makes a UDP request and returns response as bytes'''
-		if self.isClosed: raise SourceError(self, "Request attempt made on closed socket")
+		if self.isClosed: raise SourceError(self, "Request attempt made on closed connection")
 		self.socket.sendto(request, (self.ip, self.port))
 		return self._response()
 	
@@ -141,8 +165,9 @@ class SourceServer():
 			"name": "str", "map": "str", "folder": "str", "game": "str",
 			"id": "short",
 			"players": "byte", "max_players": "byte", "bots": "byte",
-			"server_type": "byte", "environment": "byte", "visibility": "byte", "VAC": "byte", "version": "str",
-			"EDF": "byte"
+			"server_type": "byte", "environment": "byte", "visibility": "byte", "VAC": "byte",
+			"mode": "", "witnesses": "", "duration": "",
+			"version": "str", "EDF": "byte"
 		}
 
 		chars = PeekableStream(inf)
@@ -154,34 +179,63 @@ class SourceServer():
 			elif typ == "short":
 				tokens[name] = self._scanInt(chars, 16)
 			
-			if name == "game" and tokens[name] == "The Ship": raise SourceError(self, "'The Ship' servers not currently supported due to different response params, sorry.")
+			# If the game is The Ship, set the tokens only present on servers running The Ship to their type so they are read
+			if name == "game" and tokens[name] == "The Ship": tokens.update({"mode": "byte", "witnesses": "byte", "duration": "byte"})
+
 			#elif name == "server_type" and b"%c" % tokens[name] == b"p": raise SourceError(self, "SourceTV proxies not supported.")
 			# looks like the code could work with proxies so I've commented out the line that raises an error, untested though
 		
-		if tokens["EDF"] & 0x80: tokens.update({ "port": self._scanInt(chars, 16) })
-		if tokens["EDF"] & 0x10: tokens.update({ "steam_id": self._scanInt(chars, 64, False) })
-		if tokens["EDF"] & 0x40:
-			tokens.update({ "sourceTV_port": self._scanInt(chars, 16) })
-			tokens.update({ "sourceTV_name": self._scanString(chars) })
-		if tokens["EDF"] & 0x20: tokens.update({ "keywords": self._scanString(chars) })
-		if tokens["EDF"] & 0x01:
-			tokens.update({ "game_id": self._scanInt(chars, 64, False) })
-			tokens["id"] = 16777215 & tokens["game_id"]
+		if tokens["EDF"] is not None:
+			if tokens["EDF"] & 0x80: tokens.update({ "port": self._scanInt(chars, 16) })
+			if tokens["EDF"] & 0x10: tokens.update({ "steam_id": self._scanInt(chars, 64, False) })
+			if tokens["EDF"] & 0x40:
+				tokens.update({ "sourceTV_port": self._scanInt(chars, 16) })
+				tokens.update({ "sourceTV_name": self._scanString(chars) })
+			if tokens["EDF"] & 0x20: tokens.update({ "keywords": self._scanString(chars) })
+			if tokens["EDF"] & 0x01:
+				tokens.update({ "game_id": self._scanInt(chars, 64, False) })
+				tokens["id"] = 16777215 & tokens["game_id"]
 		
+		# If the game isnt The Ship, remove the attributes for it
+		# (can't combine this with the if above as you cant change the size of a dict while iterating over it)
+		if tokens["game"] != "The Ship":
+			del tokens["mode"]
+			del tokens["witnesses"]
+			del tokens["duration"]
+
 		return tokens
 
-	def _tokenisePlayers(self, plrs: bytes) -> tuple:
+	def _tokenisePlayers(self, plrs: bytes, numPlrs: int) -> tuple:
 		'''Tokenises players response into usable array'''
 		chars = PeekableStream(plrs)
 		player = []
-		while chars.next is not None:
-			player.append(chars.moveNext())
-			player.append(self._scanString(chars))
-			player.append(self._scanInt(chars, 32))
-			player.append(self._scanFloat(chars, 32))
 
-			yield tuple(player)
-			player = []
+		if self.info["game"] !=  "The Ship":
+			while chars.next is not None:
+				# Scan player data
+				player.append(chars.moveNext())
+				player.append(self._scanString(chars))
+				player.append(self._scanInt(chars, 32))
+				player.append(self._scanFloat(chars, 32))
+
+				yield tuple(player)
+				player = []
+		else:
+			for i in range(numPlrs):
+				# Scan player data
+				player.append(chars.moveNext())
+				player.append(self._scanString(chars))
+				player.append(self._scanInt(chars, 32))
+				player.append(self._scanFloat(chars, 32))
+
+				# Calculate start point of The Ship data for this player (64 bits per The Ship extra player data, long + long)
+				# and append data to player list
+				index = len(plrs) - (numPlrs - i) * 8
+				player.append(int.from_bytes(plrs[index:index + 4], "little", signed=True))
+				player.append(int.from_bytes(plrs[index + 4:index + 8], "little", signed=True))
+
+				yield tuple(player)
+				player = []
 	
 	def _tokeniseRules(self, rules: bytes) -> dict:
 		rulesDict = {}
@@ -191,20 +245,20 @@ class SourceServer():
 		
 		return rulesDict
 	
-	def refreshInfo(self):
-		'''Gets the server's information and assigns it to self.info'''
+	def _getInfo(self):
+		'''Gets the server's information'''
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
 		if self._packetSplit(response): response = self._processSplitPacket(response)
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
-		tokens = self._tokeniseInfo(response[5:])
-		self.info = tokens
+		return self._tokeniseInfo(response[5:])
 	
 	def getPlayers(self) -> tuple:
 		'''
 		Gets a list of all players on the server\n
-		returns (count: int, players: tuple)\n
+		returns (count: int, players: tuple), where each player in players is in the form: (index: int, name: str, score: int, duration: float), 
+		unless the server is running The Ship, in which case each player is in the form: (index: int, name: str, score: int, duration: float, deaths: int, money: int)\n
 		If server is running CS:GO and has disabled returning players, connection times out\n
 		If server is running CS:GO and has been set to only return max players and server uptime, returns (max players: int, server uptime: float)
 		'''
@@ -224,8 +278,12 @@ class SourceServer():
 			return response[5], self._scanFloat(PeekableStream(response[6:]), 32)
 		
 		# Tokenise and return players
-		players = tuple(self._tokenisePlayers(response[6:]))
-		return len(players), players
+		# <------------------------------------ WARNING ------------------------------------>
+		# it seems if a player is joining, they are still added to the payload with a blank name.
+		# If, however, the count attribute differs from the number of player objects in the payload and the server is running The Ship, this will error.
+		count = response[5]
+		players = tuple(self._tokenisePlayers(response[6:], count))
+		return count, players
 	
 	def getRules(self) -> dict:
 		'''
