@@ -11,7 +11,6 @@ class SourceError(Exception):
 		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
 		super().__init__(self.message)
 		server.close()
-		
 
 class SourceServer():
 	'''
@@ -31,8 +30,11 @@ class SourceServer():
 		self.ip, self.port = connectionString.split(":")
 		self.port = int(self.port)
 
-		self.refreshInfo()
 		self._log("Connected successfully")
+
+	@property
+	def info(self):
+		return self._getInfo()
 
 	def _log(self, *args):
 		print("Source Server @ ", self.ip, ":", self.port, " | ", *args, sep="")
@@ -221,15 +223,14 @@ class SourceServer():
 		
 		return rulesDict
 	
-	def refreshInfo(self):
-		'''Gets the server's information and assigns it to self.info'''
+	def _getInfo(self):
+		'''Gets the server's information'''
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
 		if self._packetSplit(response): response = self._processSplitPacket(response)
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
-		tokens = self._tokeniseInfo(response[5:])
-		self.info = tokens
+		return self._tokeniseInfo(response[5:])
 	
 	def getPlayers(self) -> tuple:
 		'''
