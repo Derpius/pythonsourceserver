@@ -59,5 +59,8 @@ Trouble in Terrorist Town
 (0, 'Nbx3k', 17, 9938.7001953125)
 ```
 
+## Discord Server
+https://discord.gg/D6s5SX
+
 ## License
 GNU General Public License v3.0
