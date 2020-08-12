@@ -1,7 +1,7 @@
 class SourceError(Exception):
 	'''Errors regarding source engine servers'''
 	def __init__(self, server, message):
-		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
+		self.message = "Source Server Error @ " + server._ip + ":" + str(server._port) + " | " + message
 		super().__init__(self.message)
 
 class MasterError(Exception):

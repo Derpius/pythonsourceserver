@@ -23,9 +23,10 @@ class SourceServer(object):
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket.setblocking(0)
 
-		# Set IP and port
-		self.ip, self.port = connectionString.split(":")
-		self.port = int(self.port)
+		# Set up connection
+		self._ip, self._port = connectionString.split(":")
+		self._port = int(self._port)
+		self.socket.connect((self._ip, self._port))
 
 		try: self._connect()
 		except SourceError:
@@ -38,7 +39,7 @@ class SourceServer(object):
 		return self._getInfo()
 
 	def _log(self, *args):
-		print("Source Server @ ", self.ip, ":", self.port, " | ", *args, sep="")
+		print("Source Server @ ", self._ip, ":", self._port, " | ", *args, sep="")
 
 	def _validConString(self, conString: str) -> bool:
 		'''Validates a connection string'''
@@ -94,7 +95,7 @@ class SourceServer(object):
 	def _request(self, request: bytes) -> bytes:
 		'''Makes a UDP request and returns response as bytes'''
 		if self.isClosed: raise SourceError(self, "Request attempt made on closed connection")
-		self.socket.sendto(request, (self.ip, self.port))
+		self.socket.sendall(request)
 		return self._response()
 	
 	def _packetSplit(self, packet: bytes) -> bool:
