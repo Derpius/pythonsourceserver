@@ -4,14 +4,9 @@ import re
 import time
 import bz2
 from sourceserver.peekablestream import PeekableStream
+from sourceserver.exceptions import SourceError
 
-class SourceError(Exception):
-	'''Errors regarding source engine servers'''
-	def __init__(self, server, message):
-		self.message = "Source Server Error @ " + server.ip + ":" + str(server.port) + " | " + message
-		super().__init__(self.message)
-
-class SourceServer():
+class SourceServer(object):
 	'''
 	Represents a source engine server, and implements functions to abstract requests.\n
 	connectionString should be in the form ipv4:port
@@ -155,12 +150,12 @@ class SourceServer():
 		ret = str(ret, encoding="utf-8")
 		return ret
 
-	def _scanInt(self, chars: PeekableStream, bits: int, signed: bool = True) -> int:
+	def _scanInt(self, chars: PeekableStream, bits: int, signed: bool = True, bigEndian = False) -> int:
 		'''Scans an integer of length bits'''
 		if bits % 8 != 0: raise ValueError("bits is not a multiple of 8")
 		byteString = bytes()
 		for _ in range(int(bits / 8)): byteString += b"%c" % chars.moveNext()
-		return int.from_bytes(byteString, "little", signed=signed)
+		return int.from_bytes(byteString, ("big" if bigEndian else "little"), signed=signed)
 
 	def _scanFloat(self, chars: PeekableStream, bits: int) -> float:
 		'''Scans a float of length bits'''

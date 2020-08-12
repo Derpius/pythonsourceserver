@@ -32,7 +32,7 @@ Any attempts to set the `.info` property will result in an `AttributeError`.
 |--------|-------------|
 | `SourceServer.getPlayers()` | Returns a tuple containing each player on the server, and the count<br>(see below) |
 | `SourceServer.getRules()` | Returns the server rules as a dictionary of `name: value` pairs<br>Note, if the server is running CS:GO, this will time out |
-| `SourceServer.close()` | Marks the server as closed and prevents further requests from being made until a successfull `retry()` call |
+| `SourceServer.close()` | Marks the server as closed and prevents further requests from being made until a successful `retry()` call |
 | `SourceServer.retry()` | Attempts to re-establish a connection to the server |
 | `SourceServer.ping(places=0)` | Times an info request and returns the time taken in miliseconds rounded to `places` |
 
