@@ -126,7 +126,15 @@ class MasterServer(object):
 
 			if key not in self.FILTERS.keys() or type(val).__name__ != self.FILTERS[key]:
 				raise ValueError("Filter '" + key + "' is invalid or has an invalid value")
-			filterString += "\\%s\\%d" % (key, str(val))
+
+			filterString += "\\%s" % key
+			if type(val).__name__ == "tuple":
+				if not all(isinstance(ele, str) for ele in val): raise ValueError("Tag list doesn't only contain strings")
+				filterString += "\\%s" % val[0]
+				if len(val) == 1: continue
+				for ele in val[1:]: filterString += ",%s" % ele
+			else: filterString += "\\%s" % str(val)
+			
 		
 		return filterString
 
@@ -137,6 +145,7 @@ class MasterServer(object):
 		'''
 		# Handle filters
 		filterString = self._validateAndBuildFilters(filters) # This raises error if the filter dict is invalid
+		print(filterString)
 
 		# Handle rate limiting on initial connection
 		while True:
