@@ -70,7 +70,7 @@ class SourceServer(object):
 			self._log("Failed to reconnect")
 		else: self._log("Reconnected successfully")
 
-	def ping(self, places=0):
+	def ping(self, places: int = 0) -> float:
 		'''
 		Times an info request to the server and returns it in miliseconds\n
 		places is how many decimal places to round the ping to, default is 0
