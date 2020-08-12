@@ -1,4 +1,5 @@
 # WARNING: this readme is outdated as of the latest commit (excluding this one), I'm working on a better documentation method
+## UPDATE: I've almost finished moving documentation over to the wiki
 
 # Python Source Server Query Library
 A Python package for communicating with a Source Engine Server over UDP  
