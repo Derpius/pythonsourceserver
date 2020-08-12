@@ -1,3 +1,5 @@
+# WARNING: this readme is outdated as of the latest commit (excluding this one), I'm working on a better documentation method
+
 # Python Source Server Query Library
 A Python package for communicating with a Source Engine Server over UDP  
 This is currently a work in progess, but performs all 3 non depreciated queries on standard source servers.  
