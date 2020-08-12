@@ -1,4 +1,4 @@
-class PeekableStream:
+class PeekableStream(object):
 	def __init__(self, iterator):
 		self.iterator = iter(iterator)
 		self._fill()
