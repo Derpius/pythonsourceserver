@@ -1,16 +1,13 @@
-# WARNING: this readme is outdated as of the latest commit (excluding this one), I'm working on a better documentation method
-
 # Python Source Server Query Library
 A Python package for communicating with a Source Engine Server over UDP  
-This is currently a work in progess, but performs all 3 non depreciated queries on standard source servers.  
 
-I push changes to the master branch whenever I finish a session of working on this. If you want the absolute latest version, download the code and use it manually, otherwise install through pip for the latest version I class as stable enough to use.  
+I push changes to the master branch whenever I finish a session of working on this. If you want the absolute latest version, download the code and use it manually, otherwise install through pip for the latest version I class as stable enough to use in your own projects.  
 
 ### Known problems/limitations I'm working on
 * Goldensource servers will cause unknown (possibly uncaught) errors
 
 ### New features I'm working on
-* Querying master server
+* Goldensource support
 
 ### Untested
 * Split package payload decompression
@@ -21,26 +18,13 @@ I push changes to the master branch whenever I finish a session of working on th
 ## Installation
 `pip install sourceserver`
 
-## Usage
-A `SourceServer` object acts as a connection to a Source engine server, with its own socket.  
+## Basic Usage
+A [`SourceServer`](https://github.com/100PXSquared/pythonsourceserver/wiki/SourceServer) object acts as a connection to a Source engine server, with its own socket.  
 To instantiate a new `SourceServer` object, simply pass it a connection string in the form `ipv4:port`, the object will attempt to get the server's info, and if the connection fails after max retries, raises a `SourceError`.  
-Note, all errors that are expected are raised as `SourceError`, which marks the server as closed, but does not actually close the socket so the connection can be re-established.
-
+Note, all errors that are expected are raised as `SourceError`, which marks the server as closed, but does not actually close the socket so the connection can be re-established.  
 The information regarding a server is retrieved each time you access the `.info` property, and is a dictionary in the form `"info_type": "value"`.  
-Any attempts to set the `.info` property will result in an `AttributeError`.
 
-### Methods Overview:
-| Method | Use |
-|--------|-------------|
-| `SourceServer.getPlayers()` | Returns a tuple containing each player on the server, and the count<br>(see below) |
-| `SourceServer.getRules()` | Returns the server rules as a dictionary of `name: value` pairs<br>Note, if the server is running CS:GO, this will time out |
-| `SourceServer.close()` | Marks the server as closed and prevents further requests from being made until a successful `retry()` call |
-| `SourceServer.retry()` | Attempts to re-establish a connection to the server |
-| `SourceServer.ping(places=0)` | Times an info request and returns the time taken in miliseconds rounded to `places` |
-
-The `.getPlayers()` method returns (count, players), where count is the count specified in the response packet (can be different from actual number of players returned, see note at https://developer.valvesoftware.com/wiki/Server_queries#Response_Format_2), and players is a tuple of tuples, where each tuple represents a player and is in the format `(index: int, name: str, score: int, duration: float)`, unless the server is running The Ship, in which case they're in the format `(index: int, name: str, score: int, duration: float, deaths: int, money: int)`
-
-Also, it appears that if a player is in the process of joining, they will still be in the players tuple with valid information, but their name will be blank. This may mean that the note on the valve dev website is incorrect, as the player is counted as joined still.
+A [`MasterServer`](https://github.com/100PXSquared/pythonsourceserver/wiki/MasterServer) object lets you query the Steam master servers, see [the wiki](https://github.com/100PXSquared/pythonsourceserver/wiki) for details
 
 ## Example
 ```python
