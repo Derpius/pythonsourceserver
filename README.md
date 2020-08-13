@@ -48,5 +48,8 @@ Trouble in Terrorist Town
 ## Discord Server
 https://discord.gg/aKDNstq
 
+## Discord Bot
+https://github.com/100PXSquared/pythonsourceserverdiscordbot
+
 ## License
 GNU General Public License v3.0
