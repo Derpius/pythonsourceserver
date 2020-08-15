@@ -17,6 +17,9 @@ class SourceServer(object):
 		self.TIME_UNTIL_RETRY = float(3)
 		self.isClosed = False
 
+		# A tuple that lines up with the mode numbers for The Ship
+		self.MODES = ("Hunt", "Elimination", "Duel", "Deathmatch", "VIP Team", "Team Elimination")
+
 		if not self._validConString(connectionString): raise ValueError("Connection string invalid")
 
 		# Init socket
