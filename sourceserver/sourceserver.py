@@ -17,6 +17,9 @@ class SourceServer(object):
 		self.TIME_UNTIL_RETRY = float(3)
 		self.isClosed = False
 
+		# Cached info for internal use
+		self._info = {}
+
 		# A tuple that lines up with the mode numbers for The Ship
 		self.MODES = ("Hunt", "Elimination", "Duel", "Deathmatch", "VIP Team", "Team Elimination")
 
@@ -39,7 +42,8 @@ class SourceServer(object):
 
 	@property
 	def info(self):
-		return self._getInfo()
+		self._info = self._getInfo()
+		return self._info
 	
 	@property
 	def rules(self):
@@ -102,8 +106,14 @@ class SourceServer(object):
 	def _request(self, request: bytes) -> bytes:
 		'''Makes a UDP request and returns response as bytes'''
 		if self.isClosed: raise SourceError(self, "Request attempt made on closed connection")
+
 		self.socket.sendall(request)
-		return self._response()
+		response = self._response()
+		if self._packetSplit(response):
+			if self._info == {}: raise SourceError(self, "Unable to process a split packet without info. This exception is likely caused due to a split info request")
+			response = self._processSplitPacket(response)
+		
+		return response
 	
 	def _packetSplit(self, packet: bytes) -> bool:
 		'''Checks whether a packet is split or not, returns true if so'''
@@ -112,10 +122,12 @@ class SourceServer(object):
 		if header == -2: return True
 		raise SourceError(self, "Invalid packet header")
 
-	def _processSplitPacket(self, splitPacket: bytes, sizeAttrPresent: bool) -> bytes:
+	def _processSplitPacket(self, splitPacket: bytes) -> bytes:
 		'''Orders, concatenates, and decompresses the payloads of a split packet'''
 		if not self._packetSplit(splitPacket): raise SourceError(self, "Attempted to process singular packet as split")
+
 		# Define split packet attributes
+		sizeAttrPresent = not (self._info["protocol"] == 7 and self._info["id"] in (215, 17550, 17700, 240))
 		packetID = self._scanInt(PeekableStream(splitPacket[4:8]), 32)
 		totalPackets = splitPacket[8]
 		compressed = packetID < 0
@@ -261,7 +273,6 @@ class SourceServer(object):
 	def _getInfo(self):
 		'''Gets the server's information'''
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
-		if self._packetSplit(response): raise SourceError(self, "Info response was split, this would cause an infinite loop trying to find if the size attr is present")
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
@@ -283,9 +294,7 @@ class SourceServer(object):
 		if len(challengeResponse) != 9 or challengeResponse[4] != 0x41: raise SourceError(self, "Challenge response header invalid")
 
 		# Get player list
-		sizeAttrPresent = not (self.info["protocol"] == 7 and self.info["id"] in (215, 17550, 17700, 240)) # cache info before sending a request that might produce a split response
 		response = self._request(bytes.fromhex("FF FF FF FF 55") + challengeResponse[5:])
-		if self._packetSplit(response): response = self._processSplitPacket(response, sizeAttrPresent)
 		if len(response) < 6 or response[4] != 0x44: raise SourceError(self, "Players response header invalid")
 		if self.info["game"] == "Counter-Strike: Global Offensive" and len(response) == 9:
 			self._log("Warning, CS:GO server has only returned max players and server uptime")
@@ -309,13 +318,11 @@ class SourceServer(object):
 		if self.info["game"] == "Counter-Strike: Global Offensive": self._log("CS:GO servers don't support rules requests"); return
 
 		# Send challenge request
-		challengeResponse =    self._request(bytes.fromhex("FF FF FF FF 56 FF FF FF FF"))
+		challengeResponse = self._request(bytes.fromhex("FF FF FF FF 56 FF FF FF FF"))
 		if len(challengeResponse) != 9 or challengeResponse[4] != 0x41: raise SourceError(self, "Challenge response header invalid")
 
 		# Get rules list
-		sizeAttrPresent = not (self.info["protocol"] == 7 and self.info["id"] in (215, 17550, 17700, 240)) # cache info before sending a request that might produce a split response
 		response = self._request(bytes.fromhex("FF FF FF FF 56") + challengeResponse[5:])
-		if self._packetSplit(response): response = self._processSplitPacket(response, sizeAttrPresent)
 		if len(response) < 7 or response[4] != 0x45: raise SourceError(self, "Rules response header invalid")
 
 		# Tokenise and return rules
