@@ -3,12 +3,6 @@ A Python package for communicating with a Source Engine Server over UDP
 
 I push changes to the master branch whenever I finish a session of working on this. If you want the absolute latest version, download the code and use it manually, otherwise install through pip for the latest version I class as stable enough to use in your own projects.  
 
-### Known problems/limitations I'm working on
-* Goldensource servers will cause unknown (possibly uncaught) errors
-
-### New features I'm working on
-* Goldensource support
-
 ### Untested
 * Split package payload decompression
 * Split package size attribute detection
