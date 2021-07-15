@@ -13,12 +13,12 @@ I push changes to the master branch whenever I finish a session of working on th
 `pip install sourceserver`
 
 ## Basic Usage
-A [`SourceServer`](https://github.com/100PXSquared/pythonsourceserver/wiki/SourceServer) object acts as a connection to a Source engine server, with its own socket.  
+A [`SourceServer`](https://github.com/Derpius/pythonsourceserver/wiki/SourceServer) object acts as a connection to a Source engine server, with its own socket.  
 To instantiate a new `SourceServer` object, simply pass it a connection string in the form `ipv4:port`, the object will attempt to get the server's info, and if the connection fails after max retries, raises a `SourceError`.  
 Note, all errors that are expected are raised as `SourceError`, which marks the server as closed, but does not actually close the socket so the connection can be re-established.  
 The information regarding a server is retrieved each time you access the `.info` property, and is a dictionary in the form `"info_type": "value"`.  
 
-A [`MasterServer`](https://github.com/100PXSquared/pythonsourceserver/wiki/MasterServer) object lets you query the Steam master servers, see [the wiki](https://github.com/100PXSquared/pythonsourceserver/wiki) for details
+A [`MasterServer`](https://github.com/Derpius/pythonsourceserver/wiki/MasterServer) object lets you query the Steam master servers, see [the wiki](https://github.com/Derpius/pythonsourceserver/wiki) for details
 
 ## Example
 ```python
@@ -43,7 +43,7 @@ Trouble in Terrorist Town
 https://discord.gg/aKDNstq
 
 ## Discord Bot
-https://github.com/100PXSquared/pythonsourceserverdiscordbot
+https://github.com/Derpius/pythonsourceserverdiscordbot
 
 ## License
 GNU General Public License v3.0
