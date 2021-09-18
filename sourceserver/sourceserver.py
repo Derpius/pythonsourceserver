@@ -6,6 +6,9 @@ import bz2
 from sourceserver.peekablestream import PeekableStream
 from sourceserver.exceptions import SourceError
 
+# Super long regex that validates a string is a valid ip, then :, then a valid port number
+CONSTR_REGEX = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
+
 class SourceServer(object):
 	'''
 	Represents a source engine server, and implements functions to abstract requests.\n
@@ -55,9 +58,7 @@ class SourceServer(object):
 
 	def _validConString(self, conString: str) -> bool:
 		'''Validates a connection string'''
-		# Super long regex that validates a string is a valid ip, then :, then a valid port number
-		pat = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
-		if re.match(pat, conString): return True
+		if re.match(CONSTR_REGEX, conString): return True
 		return False
 
 	def _connect(self):
@@ -76,12 +77,12 @@ class SourceServer(object):
 		'''Attempts to reconnect to the server after being closed'''
 		if not self.isClosed: self._log("Connection to server is already active"); return
 		try:
-			self.isClosed = False
 			self._connect()
 		except SourceError:
-			self.isClosed = True
 			self._log("Failed to reconnect")
-		else: self._log("Reconnected successfully")
+		else:
+			self.isClosed = False
+			self._log("Reconnected successfully")
 
 	def ping(self, places: int = 0) -> float:
 		'''
@@ -103,6 +104,7 @@ class SourceServer(object):
 					if retries >= self.MAX_RETRIES: raise SourceError(self, "Connection failed after max retries (" + str(self.MAX_RETRIES) + ")")
 					retries += 1
 					startTime = time.time()
+			time.sleep(0.01) # Delay before retrying so we don't spam the connection
 
 	def _request(self, request: bytes) -> bytes:
 		'''Makes a UDP request and returns response as bytes'''
@@ -172,14 +174,12 @@ class SourceServer(object):
 
 	def _scanInt(self, chars: PeekableStream, bits: int, signed: bool = True, bigEndian = False) -> int:
 		'''Scans an integer of length bits'''
-		if bits % 8 != 0: raise ValueError("bits is not a multiple of 8")
 		byteString = bytes()
 		for _ in range(int(bits / 8)): byteString += b"%c" % chars.moveNext()
 		return int.from_bytes(byteString, ("big" if bigEndian else "little"), signed=signed)
 
 	def _scanFloat(self, chars: PeekableStream, bits: int) -> float:
 		'''Scans a float of length bits'''
-		if bits % 8 != 0: raise ValueError("bits is not a multiple of 8")
 		byteString = bytes()
 		for _ in range(int(bits / 8)): byteString += b"%c" % chars.moveNext()
 		return struct.unpack("<f", byteString)[0]
@@ -305,9 +305,9 @@ class SourceServer(object):
 		# <------------------------------------ WARNING ------------------------------------>
 		# it seems if a player is joining, they are still added to the payload with a blank name.
 		# If, however, the count attribute differs from the number of player objects in the payload and the server is running The Ship, this will error.
-		count = response[5]
-		players = tuple(self._tokenisePlayers(response[6:], count))
-		return count, players
+		inaccurateCount = response[5]
+		players = tuple(self._tokenisePlayers(response[6:], inaccurateCount))
+		return len(players), players
 	
 	def _getRules(self) -> dict:
 		'''
