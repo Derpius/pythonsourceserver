@@ -7,13 +7,13 @@ requirements = []
 
 setup(
     name="sourceserver",
-    version="0.8.1",
+    version="0.9.0",
     author="100 Pixels Squared",
     author_email="100pxsquared@gmail.com",
     description="Query Source engine servers over UDP",
     long_description=readme,
     long_description_content_type="text/markdown",
-    url="https://github.com/100PXSquared/pythonsourceserver/",
+    url="https://github.com/Derpius/pythonsourceserver/",
     packages=find_packages(),
     install_requires=requirements,
     classifiers=[
