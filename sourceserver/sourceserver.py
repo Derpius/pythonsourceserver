@@ -28,21 +28,27 @@ class SourceServer(object):
 
 		if not self._validConString(connectionString): raise ValueError("Connection string invalid")
 
-		# Init socket
-		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		self.socket.setblocking(0)
-
 		# Set up connection
 		self.constr = connectionString
 		self._ip, self._port = connectionString.split(":")
 		self._port = int(self._port)
-		self.socket.connect((self._ip, self._port))
 
 		try: self._connect()
 		except SourceError:
 			self._log("Failed to connect to server")
 			self.isClosed = True
 		else: self._log("Successfully established connection to server")
+
+	def _openSocket(self):
+		'''Open the socket to the server'''
+		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		self.socket.setblocking(0)
+		try: self.socket.connect((self._ip, self._port))
+		except socket.timeout: raise SourceError(self, "Failed to establish socket connection with server")
+	
+	def _closeSocket(self):
+		'''Close the socket'''
+		self.socket.close()
 
 	@property
 	def info(self):
@@ -104,6 +110,7 @@ class SourceServer(object):
 					if retries >= self.MAX_RETRIES: raise SourceError(self, "Connection failed after max retries (" + str(self.MAX_RETRIES) + ")")
 					retries += 1
 					startTime = time.time()
+
 			time.sleep(0.01) # Delay before retrying so we don't spam the connection
 
 	def _request(self, request: bytes) -> bytes:
@@ -111,6 +118,7 @@ class SourceServer(object):
 		if self.isClosed: raise SourceError(self, "Request attempt made on closed connection")
 
 		self.socket.sendall(request)
+
 		response = self._response()
 		if self._packetSplit(response):
 			if self._info == {}: raise SourceError(self, "Unable to process a split packet without info. This exception is likely caused due to a split info request")
@@ -273,11 +281,15 @@ class SourceServer(object):
 	
 	def _getInfo(self):
 		'''Gets the server's information'''
+		self._openSocket()
+
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
-		return self._tokeniseInfo(response[5:])
+		ret = self._tokeniseInfo(response[5:])
+		self._closeSocket()
+		return ret
 	
 	def getPlayers(self) -> tuple:
 		'''
@@ -289,6 +301,8 @@ class SourceServer(object):
 		'''
 
 		if self.info["game"] == "Counter-Strike: Global Offensive": self._log("Warning, server is running CS:GO, expect connection timeout if set to not show players")
+
+		self._openSocket()
 
 		# Send challenge request
 		challengeResponse = self._request(bytes.fromhex("FF FF FF FF 55 FF FF FF FF"))
@@ -307,6 +321,8 @@ class SourceServer(object):
 		# If, however, the count attribute differs from the number of player objects in the payload and the server is running The Ship, this will error.
 		inaccurateCount = response[5]
 		players = tuple(self._tokenisePlayers(response[6:], inaccurateCount))
+
+		self._closeSocket()
 		return len(players), players
 	
 	def _getRules(self) -> dict:
@@ -318,6 +334,8 @@ class SourceServer(object):
 		# Check if the game the server is running is CS:GO, if so, log message and return
 		if self.info["game"] == "Counter-Strike: Global Offensive": self._log("CS:GO servers don't support rules requests"); return
 
+		self._openSocket()
+
 		# Send challenge request
 		challengeResponse = self._request(bytes.fromhex("FF FF FF FF 56 FF FF FF FF"))
 		if len(challengeResponse) != 9 or challengeResponse[4] != 0x41: raise SourceError(self, "Challenge response header invalid")
@@ -327,4 +345,6 @@ class SourceServer(object):
 		if len(response) < 7 or response[4] != 0x45: raise SourceError(self, "Rules response header invalid")
 
 		# Tokenise and return rules
-		return self._tokeniseRules(response[5:])
+		ret = self._tokeniseRules(response[5:])
+		self._closeSocket()
+		return ret
