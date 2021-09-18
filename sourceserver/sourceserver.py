@@ -30,6 +30,7 @@ class SourceServer(object):
 		self.socket.setblocking(0)
 
 		# Set up connection
+		self.constr = connectionString
 		self._ip, self._port = connectionString.split(":")
 		self._port = int(self._port)
 		self.socket.connect((self._ip, self._port))
