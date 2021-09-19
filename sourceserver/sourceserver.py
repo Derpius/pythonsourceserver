@@ -83,11 +83,12 @@ class SourceServer(object):
 		'''Attempts to reconnect to the server after being closed'''
 		if not self.isClosed: self._log("Connection to server is already active"); return
 		try:
+			self.isClosed = False
 			self._connect()
 		except SourceError:
+			self.isClosed = True
 			self._log("Failed to reconnect")
 		else:
-			self.isClosed = False
 			self._log("Reconnected successfully")
 
 	def ping(self, places: int = 0) -> float:
