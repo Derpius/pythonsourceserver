@@ -7,9 +7,9 @@ requirements = []
 
 setup(
     name="sourceserver",
-    version="0.9.1",
-    author="100 Pixels Squared",
-    author_email="100pxsquared@gmail.com",
+    version="0.9.2",
+    author="Derpius",
+    author_email="derpius.yt@gmail.com",
     description="Query Source engine servers over UDP",
     long_description=readme,
     long_description_content_type="text/markdown",
