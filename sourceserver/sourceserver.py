@@ -34,8 +34,8 @@ class SourceServer(object):
 		self._port = int(self._port)
 
 		try: self._connect()
-		except SourceError:
-			self._log("Failed to connect to server")
+		except SourceError as e:
+			self._log("Failed to connect to server: " + e.message)
 			self.isClosed = True
 		else: self._log("Successfully established connection to server")
 
@@ -285,6 +285,8 @@ class SourceServer(object):
 		self._openSocket()
 
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
+		if len(response) == 9 and response[4] == 0x41: # Info request requires challenge
+			response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00") + response[5:])
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
