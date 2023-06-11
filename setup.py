@@ -7,7 +7,7 @@ requirements = []
 
 setup(
     name="sourceserver",
-    version="0.9.2",
+    version="0.10.0",
     author="Derpius",
     author_email="derpius.yt@gmail.com",
     description="Query Source engine servers over UDP",
