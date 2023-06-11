@@ -6,8 +6,15 @@ import bz2
 from sourceserver.peekablestream import PeekableStream
 from sourceserver.exceptions import SourceError
 
-# Super long regex that validates a string is a valid ip, then :, then a valid port number
-CONSTR_REGEX = re.compile(r"^(?:(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]):(?:[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[0-5][0-9][0-9][0-9][0-9]|6[0-4][0-9][0-9][0-9]|65[0-4][0-9][0-9]|655[0-2][0-9]|6553[0-5])$")
+CONSTR_REGEX = re.compile(r"(?P<hostname>.+):(?P<port>\d+)$")
+
+def parseConnectionString(conString):
+	match = CONSTR_REGEX.match(conString)
+	if not match:
+		raise ValueError("Connection string invalid")
+	
+	groups = match.groupdict()
+	return groups["hostname"], int(groups["port"])
 
 class SourceServer(object):
 	'''
@@ -26,12 +33,9 @@ class SourceServer(object):
 		# A tuple that lines up with the mode numbers for The Ship
 		self.MODES = ("Hunt", "Elimination", "Duel", "Deathmatch", "VIP Team", "Team Elimination")
 
-		if not self._validConString(connectionString): raise ValueError("Connection string invalid")
-
 		# Set up connection
 		self.constr = connectionString
-		self._ip, self._port = connectionString.split(":")
-		self._port = int(self._port)
+		self._hostname, self._port = parseConnectionString(connectionString)
 
 		try: self._connect()
 		except SourceError as e:
@@ -43,7 +47,7 @@ class SourceServer(object):
 		'''Open the socket to the server'''
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket.setblocking(0)
-		try: self.socket.connect((self._ip, self._port))
+		try: self.socket.connect((self._hostname, self._port))
 		except socket.timeout: raise SourceError(self, "Failed to establish socket connection with server")
 	
 	def _closeSocket(self):
@@ -60,12 +64,7 @@ class SourceServer(object):
 		return self._getRules()
 
 	def _log(self, *args):
-		print("Source Server @ ", self._ip, ":", self._port, " | ", *args, sep="")
-
-	def _validConString(self, conString: str) -> bool:
-		'''Validates a connection string'''
-		if re.match(CONSTR_REGEX, conString): return True
-		return False
+		print("Source Server @ ", self._hostname, ":", self._port, " | ", *args, sep="")
 
 	def _connect(self):
 		self._log("Connecting...")
@@ -285,8 +284,12 @@ class SourceServer(object):
 		self._openSocket()
 
 		response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00"))
-		if len(response) == 9 and response[4] == 0x41: # Info request requires challenge
+
+		challengeRetries = 10
+		while len(response) == 9 and response[4] == 0x41 and challengeRetries > 0: # Info request requires challenge
 			response = self._request(bytes.fromhex("FF FF FF FF 54 53 6F 75 72 63 65 20 45 6E 67 69 6E 65 20 51 75 65 72 79 00") + response[5:])
+			challengeRetries -= 1
+
 		if len(response) < 23 or response[4] != 0x49: raise SourceError(self, "Info response header invalid")
 
 		# Tokenise and return info
